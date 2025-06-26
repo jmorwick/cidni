@@ -64,5 +64,12 @@ def recall(ctx, cid):
     """Retrieve data"""
     click.echo(ctx.obj["DATASERVICE"].recall(cid))
 
+@main.command()
+@click.pass_context
+@click.argument("cid", metavar="<content-id>")
+def forget(ctx, cid):
+    """Forget data"""
+    click.echo(ctx.obj["DATASERVICE"].forget(cid))
+
 if __name__ == "__main__":
     main()
