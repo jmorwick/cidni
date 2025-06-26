@@ -35,16 +35,25 @@ def know(ctx, path, recursive: bool = False):
     def store_file(file_path):
         with open(file_path, 'rb') as f:
             cid, isnew = dataservice.know_file(f)
-        if isnew:
-            click.echo(f"Stored as {cid}")
-        else:
-            click.echo(f"Already stored as {cid}")
+        if not isnew:
+            click.echo("ALREADY STORED", err=True)
+        click.echo(f"'{file_path}' --> '{cid}'")
+        return cid, isnew
 
     if recursive and os.path.isdir(path):
+        savedfiles = 0
+        existingfiles = 0
         for dirpath, _, filenames in os.walk(path):
             for filename in filenames:
                 file_path = os.path.join(dirpath, filename)
-                store_file(file_path)
+                cid, isnew = store_file(file_path)
+                if isnew:
+                    savedfiles += 1
+                else: 
+                    existingfiles += 1
+        
+        click.echo(f"new files: {savedfiles}", err=True)
+        click.echo(f"already stored files: {existingfiles}", err=True)
     else:
         store_file(path)
 
