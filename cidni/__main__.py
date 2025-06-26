@@ -10,7 +10,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 import click
 import os
-from cidnilib import FileBasedDataService
+from cidnilib import FileBasedDataService, typers
 
 @click.group(invoke_without_command=True)
 @click.option('--dataservice', envvar="CIDNI_DATASERVICE", help="Specify data service (defaults to CIDNI_DATASERVICE)")
@@ -73,9 +73,13 @@ def forget(ctx, cid):
 
 @main.command()
 @click.pass_context
-def list(ctx):
+@click.option('-t', '--type', type=click.Choice(list(typers.keys())), help="only enumerate data of indicated type")
+def list(ctx, type):
     """list all known CID's"""
-    for cid in ctx.obj["DATASERVICE"].list_known_cids():
+    i = ctx.obj["DATASERVICE"].list_known_cids()
+    if type:
+        i = filter(lambda cid: typers[type](ctx.obj["DATASERVICE"].recall_stream(cid)), i)
+    for cid in i:
         click.echo(cid)
 
 if __name__ == "__main__":
