@@ -9,13 +9,14 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 """
 
 import click
+import os
 from cidnilib import FileBasedDataService
 
 @click.group(invoke_without_command=True)
 @click.option('--dataservice', envvar="CIDNI_DATASERVICE", help="Specify data service (defaults to CIDNI_DATASERVICE)")
 @click.pass_context
 def main(ctx, dataservice):
-    """Cidni CLI – requires a command to follow cidni"""
+    """Cidni CLI requires a command to follow cidni"""
     if ctx.invoked_subcommand is None:
         click.echo("Error: Missing command\n", err=True)
         click.echo(ctx.get_help())
@@ -26,11 +27,26 @@ def main(ctx, dataservice):
 @main.command()
 @click.pass_context
 @click.argument("path", metavar="<file path>")
-def know(ctx, path):
+@click.option('-r', '--recursive', is_flag=True, help="If set, target is treated as a directory and all files in this directory and its subdirectories are stored")
+def know(ctx, path, recursive: bool = False):
     """Store data in specified file"""
-    cid, isnew = ctx.obj["DATASERVICE"].know_file(open(path, 'rb'))
-    if isnew: click.echo("Stored as {cid}".format(cid=cid))
-    else: click.echo("Already stored as {cid}".format(cid=cid))
+    dataservice = ctx.obj["DATASERVICE"]
+
+    def store_file(file_path):
+        with open(file_path, 'rb') as f:
+            cid, isnew = dataservice.know_file(f)
+        if isnew:
+            click.echo(f"Stored as {cid}")
+        else:
+            click.echo(f"Already stored as {cid}")
+
+    if recursive and os.path.isdir(path):
+        for dirpath, _, filenames in os.walk(path):
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                store_file(file_path)
+    else:
+        store_file(path)
 
 @main.command()
 @click.pass_context
