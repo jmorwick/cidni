@@ -71,5 +71,12 @@ def forget(ctx, cid):
     """Forget data"""
     click.echo(ctx.obj["DATASERVICE"].forget(cid))
 
+@main.command()
+@click.pass_context
+def list(ctx):
+    """list all known CID's"""
+    for cid in ctx.obj["DATASERVICE"].list_known_cids():
+        click.echo(cid)
+
 if __name__ == "__main__":
     main()
