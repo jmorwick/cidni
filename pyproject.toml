@@ -1,0 +1,16 @@
+[project]
+name = "cidni"
+version = "0.0.1"
+description = "Content ID based data manipulation tool"
+authors = [{ name = "Joseph Kendall-Morwick", email = "jbmorwick@gmail.com" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+cidni = "cidni.__main__:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
