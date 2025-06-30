@@ -85,11 +85,15 @@ def list(ctx, type):
 @main.command()
 @click.pass_context
 @click.argument("cid", metavar="<content-id>")
-#@click.option('-t', '--type', type=click.Choice(list(archive_typers.keys())), help="extract from indicated type")
 def extract(ctx, cid):
     """extract and know all contents of archive identified by cid"""
     ds = ctx.obj["DATASERVICE"]
-    type = 'zip'
+    type = None
+    for t in archive_typers:
+        if typers[t](ctx.obj["DATASERVICE"].recall_stream(cid)):
+            type = t
+    if not type:
+        raise click.BadParameter("CID must represent an archive of a known type", ctx)
     ex = extractors[type]
     ex(ds, cid)
 
