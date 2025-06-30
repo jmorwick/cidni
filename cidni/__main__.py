@@ -10,7 +10,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 import click
 import os
-from cidnilib import FileBasedDataService, typers
+from cidnilib import FileBasedDataService, typers, archive_typers, extractors
 
 @click.group(invoke_without_command=True)
 @click.option('--dataservice', envvar="CIDNI_DATASERVICE", help="Specify data service (defaults to CIDNI_DATASERVICE)")
@@ -81,6 +81,17 @@ def list(ctx, type):
         i = filter(lambda cid: typers[type](ctx.obj["DATASERVICE"].recall_stream(cid)), i)
     for cid in i:
         click.echo(cid)
+
+@main.command()
+@click.pass_context
+@click.argument("cid", metavar="<content-id>")
+#@click.option('-t', '--type', type=click.Choice(list(archive_typers.keys())), help="extract from indicated type")
+def extract(ctx, cid):
+    """extract and know all contents of archive identified by cid"""
+    ds = ctx.obj["DATASERVICE"]
+    type = 'zip'
+    ex = extractors[type]
+    ex(ds, cid)
 
 if __name__ == "__main__":
     main()
