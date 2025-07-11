@@ -1,2 +1,3 @@
 pickleDB
 py-multihash
+sniffpy
