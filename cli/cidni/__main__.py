@@ -10,6 +10,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 import click
 import os
+import sniffpy
 from cidnilib import FileBasedDataService, typers, archive_typers, extractors
 
 @click.group(invoke_without_command=True)
@@ -23,6 +24,7 @@ def main(ctx, dataservice):
         ctx.exit(1)
     ctx.ensure_object(dict)
     ctx.obj["DATASERVICE"] = FileBasedDataService(dataservice)
+    ctx.obj["KNOWLEDGESERVICE"] = ctx.obj["DATASERVICE"]
 
 @main.command()
 @click.pass_context
@@ -31,13 +33,28 @@ def main(ctx, dataservice):
 def know(ctx, path, recursive: bool = False):
     """Store data in specified file"""
     dataservice = ctx.obj["DATASERVICE"]
+    knowledgeservice = ctx.obj["KNOWLEDGESERVICE"]
 
     def store_file(file_path):
         with open(file_path, 'rb') as f:
             cid, isnew = dataservice.know_file(f)
         if not isnew:
             click.echo("ALREADY STORED", err=True)
+
         click.echo(f"'{file_path}' --> '{cid}'")
+        acid, known = knowledgeservice.believe(dataservice.decode(cid), 'had_path', file_path)
+        stats = os.stat(file_path)
+        knowledgeservice.believe(acid, 'last_accessed', str(stats.st_atime))
+        knowledgeservice.believe(acid, 'last_modified', str(stats.st_mtime))
+        knowledgeservice.believe(acid, 'created', str(stats.st_ctime))
+        try:
+            mime = sniffpy.sniff(open(file_path, 'rb').read())
+            knowledgeservice.believe(dataservice.decode(cid), 'mime_type', mime.type)
+            knowledgeservice.believe(dataservice.decode(cid), 'mime_subtype', mime.subtype)
+        except: 
+            print('sniffpy error')
+            knowledgeservice.believe(dataservice.decode(cid), 'mime_type', 'error')
+
         return cid, isnew
 
     if recursive and os.path.isdir(path):
@@ -46,16 +63,21 @@ def know(ctx, path, recursive: bool = False):
         for dirpath, _, filenames in os.walk(path):
             for filename in filenames:
                 file_path = os.path.join(dirpath, filename)
-                cid, isnew = store_file(file_path)
-                if isnew:
-                    savedfiles += 1
-                else: 
-                    existingfiles += 1
+                if not os.path.islink(file_path): 
+                    cid, isnew = store_file(file_path)
+                    if isnew:
+                        savedfiles += 1
+                    else: 
+                        existingfiles += 1
+                else:
+                    print('skipping symbolic link')
         
         click.echo(f"new files: {savedfiles}", err=True)
         click.echo(f"already stored files: {existingfiles}", err=True)
-    else:
+    elif not os.path.islink(path): 
         store_file(path)
+    else:
+        print('skipping symbolic link')
 
 @main.command()
 @click.pass_context
@@ -88,6 +110,7 @@ def list(ctx, type):
 def extract(ctx, cid):
     """extract and know all contents of archive identified by cid"""
     ds = ctx.obj["DATASERVICE"]
+    ks = ctx.obj["KNOWLEDGESERVICE"]
     type = None
     for t in archive_typers:
         if typers[t](ctx.obj["DATASERVICE"].recall_stream(cid)):
@@ -95,7 +118,8 @@ def extract(ctx, cid):
     if not type:
         raise click.BadParameter("CID must represent an archive of a known type", ctx)
     ex = extractors[type]
-    ex(ds, cid)
+    ex(ds, ks, cid)
+
 
 if __name__ == "__main__":
     main()

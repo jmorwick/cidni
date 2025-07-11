@@ -1,6 +1,6 @@
 import os
 import sys
-from .main import DataService
+from .main import DataService, KnowledgeService
 
 def is_pdf(stream) -> bool:
     try:
@@ -47,7 +47,7 @@ def is_gz(stream) -> bool:
         return False
 
 
-def extract_generic(ds: DataService, cid: str, extension: str, command: str):
+def extract_generic(ds: DataService, ks:KnowledgeService, cid: str, extension: str, command: str):
     os.mkdir('/tmp/'+cid)
     fin = ds.recall_stream(cid)
     fout = open("/tmp/{cid}/{cid}.{extension}".format(cid=cid,extension=extension), 'wb')
@@ -69,6 +69,7 @@ def extract_generic(ds: DataService, cid: str, extension: str, command: str):
             bcid, known = ds.know_file(open(os.path.join(root,file), 'rb')) 
             if not known: print("ALREADY ", end='')
             print("STORED AS " + bcid)
+            ks.believe(ds.decode(cid), 'CONTAINS', bcid)
     os.system("rm -rf /tmp/"+cid)
 
 typers = {
@@ -87,10 +88,10 @@ archive_typers = {
 }
 
 extractors = {
-    'zip': lambda ds, cid : extract_generic(ds, cid, 'zip', 
+    'zip': lambda ds, ks, cid : extract_generic(ds, ks, cid, 'zip', 
                                             "unzip /tmp/{cid}/{cid}.{extension} -d /tmp/{cid}/"),
-    'gz': lambda ds, cid : extract_generic(ds, cid, 'gz', 
+    'gz': lambda ds, ks, cid : extract_generic(ds, ks, cid, 'gz', 
                                             "zcat /tmp/{cid}/{cid}.{extension} > /tmp/{cid}/{cid}.out"),
-    'tar': lambda ds, cid : extract_generic(ds, cid, 'tar', 
+    'tar': lambda ds, ks, cid : extract_generic(ds, ks, cid, 'tar', 
                                             "tar -xvf /tmp/{cid}/{cid}.{extension} -C /tmp/{cid}/")
 }

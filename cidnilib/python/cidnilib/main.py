@@ -56,6 +56,7 @@ class DataService:
         """remember given data for future retrieval"""
         pass
 
+
     @abstractmethod
     def recall_binary(self, id:bytes) -> bytes:
         """retrieve data associated with id"""
@@ -81,6 +82,7 @@ class DataService:
         """retrieve data associated with id"""
         return self.recall_binary(self.decode(id))
 
+
     def forget(self, id:str) -> bytes:
         """forget data associated with id"""
         return self.forget_binary(self.decode(id))
@@ -93,3 +95,15 @@ class DataService:
         """determine if value is available for given id"""
         return self.known_binary(self.decode(id))
 
+
+class KnowledgeService:
+
+    @abstractmethod
+    def believe(self, cid:bytes, property:str, acid:bytes) -> tuple[bytes, bool]:
+        """associate annotation with data"""
+        pass
+
+    @abstractmethod
+    def inquire(self, id:str, property:str|None = None) -> bytes:
+        """retrieve annotations associated with id"""
+        pass
