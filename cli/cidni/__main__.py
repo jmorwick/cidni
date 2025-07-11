@@ -95,6 +95,18 @@ def forget(ctx, cid):
 
 @main.command()
 @click.pass_context
+@click.argument("cid", metavar="<content-id>")
+def confirm(ctx, cid):
+    """Confirm cid for stored data (check for errors in storage)"""
+    dstream = ctx.obj["DATASERVICE"].recall_stream(cid)
+    ncid, updated = ctx.obj["DATASERVICE"].know_file(dstream)
+    if ncid == cid and not updated:
+        print('identity confirmed')
+    else:
+        print('error: ' + cid + ' != ' + ncid)
+
+@main.command()
+@click.pass_context
 @click.option('-t', '--type', type=click.Choice(list(typers.keys())), help="only enumerate data of indicated type")
 def list(ctx, type):
     """list all known CID's"""
