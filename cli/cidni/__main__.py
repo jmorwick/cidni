@@ -60,7 +60,7 @@ def know(ctx, path, recursive: bool = False):
         except: 
             print('sniffpy error')
             knowledgeservice.believe(dataservice.decode(cid), 'mime_type', 'error')
-        
+        knowledgeservice.flush()
         return cid, isnew
 
     if recursive and os.path.isdir(path):
@@ -149,6 +149,7 @@ def extract(ctx, cid):
         raise click.BadParameter("CID must represent an archive of a known type", ctx)
     ex = extractors[type]
     ex(ds, ks, cid)
+    ks.flush()
 
 
 if __name__ == "__main__":

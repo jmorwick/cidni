@@ -32,9 +32,6 @@ CREATE INDEX idx_subject_property ON kb(subject, property);
 
 CREATE INDEX idx_property_value ON kb(property, value);
 """
-    
-
-
 
 each_sql = """
 -- Enable Write-Ahead Logging (WAL)
@@ -60,6 +57,11 @@ class FileBasedDataService(DataService,KnowledgeService):
                  levels: int = 2):  
         if not os.path.exists(path):
             raise ValueError('Path {path} does not exist.'.format(path=path))
+            
+            
+        self.kblog = open(path+'/fbds-kb.txt', 'a')    
+            
+        """TODO: separate out sqlite-based approach as separate component. too slow for default
         if not os.path.exists(path+'/fbds-kb.db'):
             self.dbcon = sqlite3.connect(path+'/fbds-kb.db')
             cursor = self.dbcon.cursor()
@@ -67,7 +69,9 @@ class FileBasedDataService(DataService,KnowledgeService):
             self.dbcon.commit()
         else:
             self.dbcon = sqlite3.connect(path+'/fbds-kb.db')
-            
+        """
+        
+        
         super().__init__(encoder, decoder, hasher)
         self.path = path
         self.size_limit = size_limit
@@ -206,13 +210,18 @@ class FileBasedDataService(DataService,KnowledgeService):
 
     def believe(self, subject:bytes, property:str, value:str) -> tuple[bytes, bool]:
         """associate annotation with data"""
-        cursor = self.dbcon.cursor()
 
         tripletxt = self.encode(subject) + "," + property + "," + value
         
         m = self.hasher()
         m.update(bytes(tripletxt, 'utf8'))
         cid = m.digest()
+        
+        print(tripletxt +"\n")
+        self.kblog.write(tripletxt +"\n")
+        
+        """TODO: separate out sqlite-based approach as separate component. too slow for default
+        cursor = self.dbcon.cursor()
 
         cursor.execute("SELECT cid FROM kb WHERE cid = ?", (cid,))
         if cursor.fetchone():
@@ -221,10 +230,14 @@ class FileBasedDataService(DataService,KnowledgeService):
         cursor.execute("INSERT INTO kb (cid, subject, property, value) VALUES (?, ?, ?, ?)", (cid, subject, property, value))
         
         self.dbcon.commit()
+        """
         return cid, True
 
     def inquire(self, subject:bytes|None, property:str|None = None, value:bytes|None=None) -> Iterator[tuple[bytes, bytes, str, str]]:
         """retrieve annotations associated with id"""
+        
+        
+        """TODO: separate out sqlite-based approach as separate component. too slow for default
         cursor = self.dbcon.cursor()
         query = "SELECT cid, subject, property, value FROM kb "
         params = ()
@@ -238,7 +251,12 @@ class FileBasedDataService(DataService,KnowledgeService):
             if property is not None:
                 query += " AND property = ?"
                 params += (property,)
-        print((query, params))
         cursor.execute(query, params)
         for row in cursor.fetchall():
             yield (row[0], row[1], row[2], row[3])
+        """
+        return None
+        
+    def flush(self):
+        """synchronize kb with persistent storage"""
+        self.kblog.flush()

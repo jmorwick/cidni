@@ -1,5 +1,6 @@
 import os
 import sys
+import sniffpy
 from .main import DataService, KnowledgeService
 
 def is_pdf(stream) -> bool:
@@ -70,6 +71,8 @@ def extract_generic(ds: DataService, ks:KnowledgeService, cid: str, extension: s
             if not known: print("ALREADY ", end='')
             print("STORED AS " + bcid)
             ks.believe(ds.decode(cid), 'CONTAINS', bcid)
+            acid, known = ks.believe(ds.decode(cid), 'HAD_PATH', os.path.join(root,file)[len(cid)+5:])
+                
     os.system("rm -rf /tmp/"+cid)
 
 typers = {
