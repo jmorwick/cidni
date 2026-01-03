@@ -223,22 +223,22 @@ class FileBasedDataService(DataService,KnowledgeService):
         self.dbcon.commit()
         return cid, True
 
-    def inquire(self, subject:bytes|None, property:str|None = None, value:str|None=None) -> Iterator[tuple[bytes, bytes, str, str]]:
+    def inquire(self, subject:bytes|None, property:str|None = None, value:bytes|None=None) -> Iterator[tuple[bytes, bytes, str, str]]:
         """retrieve annotations associated with id"""
         cursor = self.dbcon.cursor()
-        query = "SELECT cid, subject, property, value FROM kb WHERE "
+        query = "SELECT cid, subject, property, value FROM kb "
         params = ()
 
         if subject is not None:
-            query += " subject = ?"
+            query += " WHERE subject = ?"
             params += (subject,)
         if value is not None:
-            query += (" AND " if subject is not None else "") + " value = ?"
+            query += (" AND " if subject is not None else "") + "WHERE  value = ?"
             params += (value,)
-        if property is not None:
-            query += " AND property = ?"
-            params += (property,)
-
+            if property is not None:
+                query += " AND property = ?"
+                params += (property,)
+        print((query, params))
         cursor.execute(query, params)
         for row in cursor.fetchall():
             yield (row[0], row[1], row[2], row[3])

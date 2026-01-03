@@ -9,7 +9,9 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 """
 
 import click
+import sys
 import os
+import stat
 import sniffpy
 from cidnilib import FileBasedDataService, typers, archive_typers, extractors
 
@@ -44,9 +46,13 @@ def know(ctx, path, recursive: bool = False):
         click.echo(f"'{file_path}' --> '{cid}'")
         acid, known = knowledgeservice.believe(dataservice.decode(cid), 'had_path', file_path)
         stats = os.stat(file_path)
+        print('storing', 'last_accessed', str(stats.st_atime))
         knowledgeservice.believe(acid, 'last_accessed', str(stats.st_atime))
+        print('storing', 'last_modified', str(stats.st_mtime))
         knowledgeservice.believe(acid, 'last_modified', str(stats.st_mtime))
+        print('storing', 'created', str(stats.st_ctime))
         knowledgeservice.believe(acid, 'created', str(stats.st_ctime))
+        
         try:
             mime = sniffpy.sniff(open(file_path, 'rb').read())
             knowledgeservice.believe(dataservice.decode(cid), 'mime_type', mime.type)
@@ -54,26 +60,33 @@ def know(ctx, path, recursive: bool = False):
         except: 
             print('sniffpy error')
             knowledgeservice.believe(dataservice.decode(cid), 'mime_type', 'error')
-
+        
         return cid, isnew
 
     if recursive and os.path.isdir(path):
         savedfiles = 0
         existingfiles = 0
+        skippedfiles = 0
         for dirpath, _, filenames in os.walk(path):
-            for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
-                if not os.path.islink(file_path): 
-                    cid, isnew = store_file(file_path)
-                    if isnew:
-                        savedfiles += 1
-                    else: 
-                        existingfiles += 1
-                else:
-                    print('skipping symbolic link')
-        
+            if stat.S_ISDIR(os.stat(dirpath).st_mode): 
+                for filename in filenames:
+                    file_path = os.path.join(dirpath, filename)
+                    try: 
+                        if stat.S_ISREG(os.stat(file_path).st_mode): 
+                            cid, isnew = store_file(file_path)
+                            if isnew and cid:
+                                savedfiles += 1
+                            elif cid: 
+                                existingfiles += 1
+                        else:
+                            click.echo("Invalid Path: " + file_path + " ...skipping", err=True)
+                            skippedfiles += 1
+                    except:
+                        click.echo("Invalid Path: " + file_path + " ...skipping", err=True)
+                        skippedfiles += 1
         click.echo(f"new files: {savedfiles}", err=True)
         click.echo(f"already stored files: {existingfiles}", err=True)
+        click.echo(f"skipped files: {skippedfiles}", err=True)
     elif not os.path.islink(path): 
         store_file(path)
     else:
@@ -107,14 +120,19 @@ def confirm(ctx, cid):
 
 @main.command()
 @click.pass_context
-@click.option('-t', '--type', type=click.Choice(list(typers.keys())), help="only enumerate data of indicated type")
-def list(ctx, type):
+@click.option('-p', '--property', help="only enumerate data with the indicated property/value")
+def list(ctx, property):
     """list all known CID's"""
-    i = ctx.obj["DATASERVICE"].list_known_cids()
-    if type:
-        i = filter(lambda cid: typers[type](ctx.obj["DATASERVICE"].recall_stream(cid)), i)
-    for cid in i:
-        click.echo(cid)
+    v = None
+    p = property
+    if property and property.find('=') > 0:
+        p, v = property.split('=')
+        i = ctx.obj["KNOWLEDGESERVICE"].inquire(None, p, v)
+        for acid, cid, p, v in i:
+            click.echo(ctx.obj["DATASERVICE"].encode(cid))
+    else:
+        for ecid in ctx.obj["KNOWLEDGESERVICE"].list_known_cids():
+            click.echo(ecid)
 
 @main.command()
 @click.pass_context
