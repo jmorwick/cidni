@@ -14,6 +14,7 @@ from typing import BinaryIO, Iterator
 from hashlib import sha256
 from typing import Protocol, runtime_checkable
 from multihash import to_b58_string, from_b58_string, encode
+from io import BytesIO
 
 @runtime_checkable
 class HashAlgorithm(Protocol):
@@ -46,16 +47,16 @@ class DataService:
         self.decode = decoder
         self.hasher = hasher
 
+
     @abstractmethod
-    def know_file(self, fp:BinaryIO) -> tuple[bytes, bool]: 
+    def know_binary(self, data:bytes) -> tuple[bytes, bool]:
         """remember given data for future retrieval"""
         pass
 
     @abstractmethod
-    def know(self, data:bytes) -> tuple[bytes, bool]:
-        """remember given data for future retrieval"""
-        pass
-
+    def known_binary(self, id:bytes) -> bool:
+        """determine if value is available for given id"""
+        return self.known_binary(self.decode(id))
 
     @abstractmethod
     def recall_binary(self, id:bytes) -> bytes:
@@ -63,37 +64,44 @@ class DataService:
         pass
 
     @abstractmethod
-    def recall_stream(self) -> BinaryIO:
-        """retrieve data associated with id"""
-        pass
-
-
-    @abstractmethod
     def forget_binary(self, id:bytes) -> bytes:
         """forget data associated with id"""
         pass
 
     @abstractmethod
-    def list_known_cids(self) -> Iterator[str]:
-        """forget data associated with id"""
+    def list_known_cids(self) -> Iterator[bytes]:
+        """list all known cids"""
         pass
+        
+    
 
-    def recall(self, id:str) -> bytes:
+    def know_file(self, fp:BinaryIO) -> tuple[bytes, bool]: 
+        """remember given data for future retrieval"""
+        return self.know_binary(fp.read())
+
+    def know(self, data:str) -> tuple[bytes, bool]: 
+        """remember given data for future retrieval"""
+        return self.know_binary(self.decode(data))
+
+    def recall(self, id:bytes|str) -> bytes:
         """retrieve data associated with id"""
-        return self.recall_binary(self.decode(id))
+        return self.recall_binary(self.decode(id)) if type(id) == str else self.recall_binary(id)
 
+    def recall_text(self, id:str) -> bytes:
+        """retrieve data associated with id"""
+        return self.encode(self.recall_binary(self.decode(id)))
 
-    def forget(self, id:str) -> bytes:
+    def recall_stream(self, id:str) -> BinaryIO:
+        """retrieve data associated with id"""
+        return BytesIO(self.recall_binary(id))
+        
+    def forget(self, id:bytes|str) -> bytes:
         """forget data associated with id"""
-        return self.forget_binary(self.decode(id))
+        return self.forget_binary(id) if type(id) == bytes else self.forget_binary(self.decode(id))
 
-    def known_binary(self, id:bytes) -> bool:
+    def known(self, id:bytes|str) -> bool:
         """determine if value is available for given id"""
-        return True if self.recall_binary(id) else False
-
-    def known(self, id:str) -> bool:
-        """determine if value is available for given id"""
-        return self.known_binary(self.decode(id))
+        return self.known_binary(id) if type(id) == bytes else self.known_binary(self.decode(id))
 
 
 class KnowledgeService:

@@ -1,0 +1,48 @@
+"""
+Copyright © 2025 Joseph Kendall-Morwick
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""
+
+from .main import DataService, KnowledgeService, HashAlgorithm, MultiHashEncoder
+from collections.abc import Callable
+from typing import BinaryIO, Iterator
+from io import BytesIO
+import os
+import sys
+from multihash import to_b58_string, from_b58_string
+
+
+class InMemoryDataService(DataService):
+    def __init__(self,
+                 encoder: Callable[[bytes],str] = to_b58_string, 
+                 decoder: Callable[[str],bytes] = from_b58_string, 
+                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder):  
+
+        
+        super().__init__(encoder, decoder, hasher)
+        self.db = dict()
+
+    def know_binary(self, data:bytes):
+        m = self.hasher()
+        m.update(data)
+        id = m.digest()
+        self.db[id] = data
+        return id, True
+
+    def known_binary(self, id:bytes):
+        return id in self.db
+
+    def recall_binary(self, id:bytes):
+        return self.db[id]
+
+    def forget_binary(self, id:bytes):
+        del self.db[id]
+
+    def list_known_cids(self) -> Iterator[bytes]:
+        return self.db.keys()
+
