@@ -79,20 +79,21 @@ class DataService:
         """remember given data for future retrieval"""
         return self.know_binary(fp.read())
 
-    def know(self, data:str) -> tuple[bytes, bool]: 
+    def know(self, data:str|bytes) -> tuple[bytes, bool]: 
         """remember given data for future retrieval"""
-        return self.know_binary(self.decode(data))
+        return self.know_binary(bytes(data, 'utf8')) if type(data) == str else self.know_binary(data)
 
     def recall(self, id:bytes|str) -> bytes:
         """retrieve data associated with id"""
         return self.recall_binary(self.decode(id)) if type(id) == str else self.recall_binary(id)
 
-    def recall_text(self, id:str) -> bytes:
+    def recall_text(self, id:bytes|str) -> bytes:
         """retrieve data associated with id"""
-        return self.encode(self.recall_binary(self.decode(id)))
+        return str(self.recall_binary(self.decode(id))) if type(id) == str else str(self.recall_binary(id))
 
-    def recall_stream(self, id:str) -> BinaryIO:
+    def recall_stream(self, id:bytes|str) -> BinaryIO:
         """retrieve data associated with id"""
+        id = id if type(id) == bytes else self.decode(id)
         return BytesIO(self.recall_binary(id))
         
     def forget(self, id:bytes|str) -> bytes:

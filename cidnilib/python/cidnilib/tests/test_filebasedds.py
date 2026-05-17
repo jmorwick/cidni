@@ -1,20 +1,22 @@
 import io
 import pytest
 
-from cidnilib.inmemds import InMemoryDataService
+from cidnilib.filebasedds import FileBasedDataService
 
 
 @pytest.fixture
-def ds():
-    return InMemoryDataService()
+def ds(tmp_path):
+    test_dir = tmp_path / "cidnilib_test_store"
+    test_dir.mkdir()
+    return FileBasedDataService(str(test_dir))
 
 
 def test_know_binary_returns_cid_and_stores_data(ds):
     cid, created = ds.know_binary(b"hello")
 
     assert created is True
-    assert ds.known_binary(cid)
-    assert ds.recall_binary(cid) == b"hello"
+    assert ds.known(cid)
+    assert ds.recall(cid) == b"hello"
 
 
 def test_same_data_gets_same_cid(ds):
@@ -45,6 +47,8 @@ def test_forget_binary_removes_data(ds):
     ds.forget_binary(cid)
 
     assert not ds.known_binary(cid)
+    assert not ds.known(cid)
+    assert not ds.recall(cid)
 
 
 def test_know_file(ds):
@@ -54,12 +58,10 @@ def test_know_file(ds):
     assert ds.recall_binary(cid) == b"file contents"
 
 
-
 def test_known_with_binary_cid(ds):
     cid, _ = ds.know_binary(b"hello")
 
     assert ds.known(cid) is True
-
 
 
 def test_recall_with_text_cid(ds):
@@ -68,10 +70,9 @@ def test_recall_with_text_cid(ds):
     assert ds.recall_binary(cid) == b"hello"
 
 
-
 def test_recall_stream(ds):
     cid, _ = ds.know_binary(b"streamed")
-
+    assert ds.known(cid)
     stream = ds.recall_stream(cid)
-
+    assert stream
     assert stream.read() == b"streamed"
