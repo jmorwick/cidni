@@ -1,0 +1,90 @@
+"""
+Copyright © 2025 Joseph Kendall-Morwick
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""
+
+from .main import DataService, KnowledgeService, HashAlgorithm, MultiHashEncoder
+from collections.abc import Callable
+from typing import BinaryIO, Iterator
+from io import BytesIO
+from pickledb import PickleDB
+import os
+import sys
+from os.path import exists
+from multihash import to_b58_string, from_b58_string
+
+
+class PickleFileBasedDataService(DataService):
+    def __init__(self,
+                 path: str,
+                 encoder: Callable[[bytes],str] = to_b58_string, 
+                 decoder: Callable[[str],bytes] = from_b58_string, 
+                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder,
+                 levels: int = 2):  
+        if not os.path.exists(path):
+            raise ValueError('Path {path} does not exist.'.format(path=path))
+            
+        super().__init__(encoder, decoder, hasher)
+        self.path = path
+        self.levels = levels
+        
+        
+    def resolve_db(self, id:str) -> PickleDB:
+        """find pickledb on the path that matches the name and generate if it doesn't exist"""
+        # TODO: cache db's, postpone writes -- consider mixing this with inmemds 
+        # TODO: consider eliminating levels (they speed up cmdline access but complicate everything else)
+        subdir = ''
+        for i in range(self.levels):
+            subdir += id[-i-1] + '/'
+            if not exists(self.path+'/'+subdir):
+                os.mkdir(self.path+'/'+subdir)
+        db = PickleDB(self.path+'/'+subdir+'pickle.db') 
+        db.load()
+        return db
+
+    def know_binary(self, data:bytes):
+        m = self.hasher()
+        m.update(data)
+        id = m.digest()
+        
+        db = self.resolve_db(self.encode(id))
+        if not db.get(self.encode(id)):
+            db.set(self.encode(id), self.encode(data))
+            db.save()
+            print(db.all())
+            return id, True
+        else:
+            return id, False
+
+    def known_binary(self, id:bytes) -> bool:
+        """determine if value is available for given id"""
+        db = self.resolve_db(self.encode(id))
+        print(db.all())
+        return db.get(self.encode(id))
+
+    def recall_binary(self, id:bytes):
+        """retrieve data associated with name"""
+        db = self.resolve_db(self.encode(id))
+        data = db.get(self.encode(id))
+        if not data: return None
+        return self.decode(data)
+
+    def forget_binary(self, id:bytes) -> bytes:
+        """forget data associated with id"""
+        db = self.resolve_db(self.encode(id))
+        db.remove(self.encode(id))
+        db.save()
+
+    def list_known_cids(self) -> Iterator[bytes]:
+        """Yield all known CIDs"""
+        for root, dirs, files in os.walk(self.path):
+            if 'pickle.db' in files:
+                db_path = os.path.join(root, 'pickle.db')
+                db = PickleDB(db_path)
+                yield from map(self.decode, db.all())
+
