@@ -66,7 +66,6 @@ class FileBasedDataService(DataService):
             return self.decode(id), False
 
     def known_binary(self, id:bytes):
-        print(self.resolve_path(self.encode(id)))
         return exists(self.resolve_path(self.encode(id)))
         
     def recall_binary(self, id:bytes):

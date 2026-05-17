@@ -54,14 +54,15 @@ def test_forget_binary_removes_data(ds):
 def test_know_file(ds):
     cid, created = ds.know_file(io.BytesIO(b"file contents"))
 
-    assert created is True
+    assert created
+    assert ds.known(cid)
     assert ds.recall_binary(cid) == b"file contents"
 
 
 def test_known_with_binary_cid(ds):
     cid, _ = ds.know_binary(b"hello")
 
-    assert ds.known(cid) is True
+    assert ds.known(cid)
 
 
 def test_recall_with_text_cid(ds):

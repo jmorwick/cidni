@@ -56,7 +56,7 @@ class DataService:
     @abstractmethod
     def known_binary(self, id:bytes) -> bool:
         """determine if value is available for given id"""
-        return self.known_binary(self.decode(id))
+        pass
 
     @abstractmethod
     def recall_binary(self, id:bytes) -> bytes:
