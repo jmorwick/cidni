@@ -38,10 +38,12 @@ class InMemoryDataService(DataService):
         return id in self.db
 
     def recall_binary(self, id:bytes):
-        return self.db[id]
+        try: return self.db[id]
+        except: return None
 
     def forget_binary(self, id:bytes):
-        del self.db[id]
+        try: del self.db[id]
+        except: return None
 
     def list_known_cids(self) -> Iterator[bytes]:
         return self.db.keys()
