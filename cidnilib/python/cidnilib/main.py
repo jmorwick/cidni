@@ -108,11 +108,11 @@ class DataService:
 class KnowledgeService:
 
     @abstractmethod
-    def believe(self, cid:bytes, property:str, acid:bytes) -> tuple[bytes, bool]:
+    def believe(self, subject: str, property: str, value: str) -> tuple[bytes, bool]:
         """associate annotation with data"""
         pass
 
     @abstractmethod
-    def inquire(self, id:str, property:str|None = None) -> bytes:
+    def inquire(self, subject:str|None, property:str|None, value:str|None) -> Iterator[tuple[str, str, str]]:
         """retrieve annotations associated with id"""
         pass
