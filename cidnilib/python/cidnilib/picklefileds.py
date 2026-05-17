@@ -32,12 +32,13 @@ class PickleFileBasedDataService(DataService):
         super().__init__(encoder, decoder, hasher)
         self.path = path
         self.levels = levels
+        self.dbcache = dict()
         
         
     def resolve_db(self, id:str) -> PickleDB:
         """find pickledb on the path that matches the name and generate if it doesn't exist"""
-        # TODO: cache db's, postpone writes -- consider mixing this with inmemds 
-        # TODO: consider eliminating levels (they speed up cmdline access but complicate everything else)
+        if id[-self.levels-1:-1] in self.dbcache:
+            return self.dbcache[id[-self.levels-1:-1]]
         subdir = ''
         for i in range(self.levels):
             subdir += id[-i-1] + '/'
@@ -45,6 +46,7 @@ class PickleFileBasedDataService(DataService):
                 os.mkdir(self.path+'/'+subdir)
         db = PickleDB(self.path+'/'+subdir+'pickle.db') 
         db.load()
+        self.dbcache[id[-self.levels-1:-1]] = db
         return db
 
     def know_binary(self, data:bytes):
@@ -55,7 +57,6 @@ class PickleFileBasedDataService(DataService):
         db = self.resolve_db(self.encode(id))
         if not db.get(self.encode(id)):
             db.set(self.encode(id), self.encode(data))
-            db.save()
             print(db.all())
             return id, True
         else:
@@ -78,7 +79,6 @@ class PickleFileBasedDataService(DataService):
         """forget data associated with id"""
         db = self.resolve_db(self.encode(id))
         db.remove(self.encode(id))
-        db.save()
 
     def list_known_cids(self) -> Iterator[bytes]:
         """Yield all known CIDs"""
@@ -87,4 +87,8 @@ class PickleFileBasedDataService(DataService):
                 db_path = os.path.join(root, 'pickle.db')
                 db = PickleDB(db_path)
                 yield from map(self.decode, db.all())
-
+                
+    def __del__(self):
+        for db in self.dbcache.values():
+            db.save()
+        
