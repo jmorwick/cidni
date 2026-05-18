@@ -18,7 +18,7 @@ setup(name="cidnilib",
         "Topic :: Database" ],
     packages=find_packages(),
     install_requires=[
-        "pickleDB",
+        "pickledb",
         "py-multihash",
         "sniffpy",
     ],
