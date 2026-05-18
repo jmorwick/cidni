@@ -6,11 +6,20 @@ authors = [{ name = "Joseph Kendall-Morwick", email = "jbmorwick@gmail.com" }]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+    "click",
+    "cidnilib==0.0.1",
+    "sniffpy",
+]
+
+[project.urls]
+Homepage = "https://github.com/jmorwick/cidni"
+Repository = "https://github.com/jmorwick/cidni"
+Issues = "https://github.com/jmorwick/cidni/issues"
 
 [project.scripts]
 cidni = "cidni.__main__:main"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
-

@@ -95,7 +95,7 @@ def know(ctx, path, recursive: bool = False):
 
 @main.command()
 @click.pass_context
-@click.argument("cid", metavar="<content-id>")
+@click.argument("cid", metavar="<content-id>") #TODO: add arg to switch between text/binary
 def recall(ctx, cid):
     """Retrieve data"""
     click.echo(ctx.obj["DATASERVICE"].recall_text(cid))
