@@ -33,10 +33,18 @@ class PickleFileBasedDataService(DataService):
         self.path = path
         self.levels = levels
         self.dbcache = dict()
+        self._closed = False
         
         
     def resolve_db(self, id:str) -> PickleDB:
         """find pickledb on the path that matches the name and generate if it doesn't exist"""
+        if self.levels == 0:
+            if self.dbcache:
+              return self.dbcache['']
+            self.dbcache[''] = PickleDB(self.path+'/'+'pickle.db') 
+            self.dbcache[''].load()
+            return self.dbcache['']
+        
         if id[-self.levels-1:-1] in self.dbcache:
             return self.dbcache[id[-self.levels-1:-1]]
         subdir = ''
@@ -57,7 +65,6 @@ class PickleFileBasedDataService(DataService):
         db = self.resolve_db(self.encode(id))
         if not db.get(self.encode(id)):
             db.set(self.encode(id), self.encode(data))
-            print(db.all())
             return id, True
         else:
             return id, False
@@ -65,7 +72,6 @@ class PickleFileBasedDataService(DataService):
     def known_binary(self, id:bytes) -> bool:
         """determine if value is available for given id"""
         db = self.resolve_db(self.encode(id))
-        print(db.all())
         return db.get(self.encode(id))
 
     def recall_binary(self, id:bytes):
@@ -82,13 +88,39 @@ class PickleFileBasedDataService(DataService):
 
     def list_known_cids(self) -> Iterator[bytes]:
         """Yield all known CIDs"""
-        for root, dirs, files in os.walk(self.path):
-            if 'pickle.db' in files:
-                db_path = os.path.join(root, 'pickle.db')
-                db = PickleDB(db_path)
-                yield from map(self.decode, db.all())
+        if self.levels == 0:
+          db = self.resolve_db('')
+          yield from map(self.decode, db.all())  
+          
+        else:
+            self.flush()
+            for root, dirs, files in os.walk(self.path):
+                if 'pickle.db' in files:
+                    db_path = os.path.join(root, 'pickle.db')
+                    db = PickleDB(db_path)
+                    db.load()
+                    yield from map(self.decode, db.all())
                 
-    def __del__(self):
+
+    def flush(self):
         for db in self.dbcache.values():
             db.save()
-        
+
+    def close(self):
+        if getattr(self, "_closed", False):
+            return
+        self.flush()
+        self._closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass

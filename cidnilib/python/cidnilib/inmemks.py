@@ -21,8 +21,9 @@ class InMemoryKnowledgeService(KnowledgeService):
         self.prop_to_val_to_subjs = defaultdict(lambda: defaultdict(set))
 
         for cid in ds.list_known_cids():
+            
             try:
-                data = ds.recall(cid)
+                data = ds.recall_binary(cid)
                 text = data.decode("utf-8")
                 triple = json.loads(text)
             except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
@@ -54,7 +55,6 @@ class InMemoryKnowledgeService(KnowledgeService):
     ) -> Iterator[tuple[str, str, str]]:
         """Retrieve matching string triples."""
         if subject is not None:
-
             for prop in ([property] if property is not None else self.subj_to_prop_to_vals[subject].keys()):
                 vals = self.subj_to_prop_to_vals[subject][prop]
                 for val in vals:

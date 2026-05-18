@@ -138,6 +138,8 @@ def test_reloads_existing_triples_from_datastore():
     ks1 = InMemoryKnowledgeService(ds)
     ks1.believe("s1", "p1", "v1")
     ks1.believe("s2", "p2", "v2")
+    
+    assert len(ds.list_known_cids()) is 2
 
     ks2 = InMemoryKnowledgeService(ds)
 
@@ -148,7 +150,7 @@ def test_reloads_existing_triples_from_datastore():
 
 
 def test_ignores_non_utf8_data_when_loading():
-    ds = InMemoryDataService(":memory:")
+    ds = InMemoryDataService()
     ds.know_binary(b"\xff\xfe\x00")
 
     ks = InMemoryKnowledgeService(ds)

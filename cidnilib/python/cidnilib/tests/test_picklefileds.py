@@ -91,7 +91,14 @@ def test_recall_with_binary_cid(ds):
 
 def test_recall_stream(ds):
     cid, _ = ds.know_binary(b"streamed")
-
     stream = ds.recall_stream(cid)
-
     assert stream.read() == b"streamed"
+
+def test_no_levels(tmp_path):
+    test_dir = tmp_path / "cidnilib_pickle_test_store"
+    test_dir.mkdir()
+    cid = None
+    with PickleFileBasedDataService(str(test_dir), levels=0) as ds:
+      cid, _ = ds.know(b'haha')
+    with PickleFileBasedDataService(str(test_dir), levels=0) as ds:
+      assert ds.recall_binary(cid) == b'haha'
