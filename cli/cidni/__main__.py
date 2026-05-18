@@ -9,11 +9,10 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 """
 
 import click
-import sys
 import os
 import stat
 import sniffpy
-from cidnilib import FileBasedDataService, typers, archive_typers, extractors
+from cidnilib import FileBasedDataService, InMemoryKnowledgeService, PickleFileBasedDataService, typers, archive_typers, extractors
 
 @click.group(invoke_without_command=True)
 @click.option('--dataservice', envvar="CIDNI_DATASERVICE", help="Specify data service (defaults to CIDNI_DATASERVICE)")
@@ -26,7 +25,9 @@ def main(ctx, dataservice):
         ctx.exit(1)
     ctx.ensure_object(dict)
     ctx.obj["DATASERVICE"] = FileBasedDataService(dataservice)
-    ctx.obj["KNOWLEDGESERVICE"] = ctx.obj["DATASERVICE"]
+    ds_for_ks = PickleFileBasedDataService(dataservice, levels=0)
+    ctx.obj["KNOWLEDGESERVICE"] = InMemoryKnowledgeService(ds_for_ks)
+    ctx.call_on_close(ds_for_ks.close)
 
 @main.command()
 @click.pass_context
@@ -43,24 +44,24 @@ def know(ctx, path, recursive: bool = False):
         if not isnew:
             click.echo("ALREADY STORED", err=True)
 
-        click.echo(f"'{file_path}' --> '{cid}'")
-        acid, known = knowledgeservice.believe(dataservice.decode(cid), 'had_path', file_path)
+        click.echo(f"'{file_path}' --> '{dataservice.encode(cid)}'")
+        acid, known = knowledgeservice.believe(dataservice.encode(cid), 'had_path', file_path)
         stats = os.stat(file_path)
-        print('storing', 'last_accessed', str(stats.st_atime))
-        knowledgeservice.believe(acid, 'last_accessed', str(stats.st_atime))
-        print('storing', 'last_modified', str(stats.st_mtime))
-        knowledgeservice.believe(acid, 'last_modified', str(stats.st_mtime))
-        print('storing', 'created', str(stats.st_ctime))
-        knowledgeservice.believe(acid, 'created', str(stats.st_ctime))
+        click.echo(f"storing last_accessed {stats.st_atime}", err=True)
+        knowledgeservice.believe(dataservice.encode(acid), 'last_accessed', str(stats.st_atime))
+        click.echo(f"storing last_modified {stats.st_mtime}", err=True)
+        knowledgeservice.believe(dataservice.encode(acid), 'last_modified', str(stats.st_mtime))
+        click.echo(f"storing created {stats.st_ctime}", err=True)
+        knowledgeservice.believe(dataservice.encode(acid), 'created', str(stats.st_ctime))
         
         try:
-            mime = sniffpy.sniff(open(file_path, 'rb').read())
-            knowledgeservice.believe(dataservice.decode(cid), 'mime_type', mime.type)
-            knowledgeservice.believe(dataservice.decode(cid), 'mime_subtype', mime.subtype)
+            with open(file_path, "rb") as f:
+                mime = sniffpy.sniff(f.read())
+            knowledgeservice.believe(dataservice.encode(cid), 'mime_type', mime.type)
+            knowledgeservice.believe(dataservice.encode(cid), 'mime_subtype', mime.subtype)
         except: 
-            print('sniffpy error')
-            knowledgeservice.believe(dataservice.decode(cid), 'mime_type', 'error')
-        knowledgeservice.flush()
+            click.echo('sniffpy error', err=True)
+            knowledgeservice.believe(dataservice.encode(cid), 'mime_type', 'error')
         return cid, isnew
 
     if recursive and os.path.isdir(path):
@@ -90,14 +91,14 @@ def know(ctx, path, recursive: bool = False):
     elif not os.path.islink(path): 
         store_file(path)
     else:
-        print('skipping symbolic link')
+        click.echo('skipping symbolic link')
 
 @main.command()
 @click.pass_context
 @click.argument("cid", metavar="<content-id>")
 def recall(ctx, cid):
     """Retrieve data"""
-    click.echo(ctx.obj["DATASERVICE"].recall(cid))
+    click.echo(ctx.obj["DATASERVICE"].recall_text(cid))
 
 @main.command()
 @click.pass_context
@@ -113,10 +114,10 @@ def confirm(ctx, cid):
     """Confirm cid for stored data (check for errors in storage)"""
     dstream = ctx.obj["DATASERVICE"].recall_stream(cid)
     ncid, updated = ctx.obj["DATASERVICE"].know_file(dstream)
-    if ncid == cid and not updated:
-        print('identity confirmed')
+    if ctx.obj["DATASERVICE"].encode(ncid) == cid and not updated:
+        click.echo('identity confirmed')
     else:
-        print('error: ' + cid + ' != ' + ncid)
+        click.echo('error: ' + cid + ' != ' + ctx.obj["DATASERVICE"].encode(ncid))
 
 @main.command()
 @click.pass_context
@@ -128,11 +129,11 @@ def list(ctx, property):
     if property and property.find('=') > 0:
         p, v = property.split('=')
         i = ctx.obj["KNOWLEDGESERVICE"].inquire(None, p, v)
-        for acid, cid, p, v in i:
-            click.echo(ctx.obj["DATASERVICE"].encode(cid))
+        for cid, _, _ in i:
+            click.echo(cid)
     else:
-        for ecid in ctx.obj["KNOWLEDGESERVICE"].list_known_cids():
-            click.echo(ecid)
+        for ecid in ctx.obj["DATASERVICE"].list_known_cids():
+            click.echo(ctx.obj["DATASERVICE"].encode(ecid))
 
 @main.command()
 @click.pass_context
@@ -149,7 +150,6 @@ def extract(ctx, cid):
         raise click.BadParameter("CID must represent an archive of a known type", ctx)
     ex = extractors[type]
     ex(ds, ks, cid)
-    ks.flush()
 
 
 if __name__ == "__main__":
