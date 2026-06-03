@@ -25,11 +25,6 @@ hashers = {
     12: sha256
 }
 
-
-# TODO: make all params bytes|str
-# TODO: make it easy to extract utf-8 text
-# TODO: make text encoding configurable
-
 class MultiHashEncoder(HashAlgorithm):
 
     def __init__(self, code:int=12):
@@ -47,11 +42,12 @@ class DataService:
     def __init__(self, 
                  encoder: Callable[[bytes],str] = to_b58_string, 
                  decoder: Callable[[str],bytes] = from_b58_string, 
-                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder): 
+                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder
+                 text_encoding: str = 'utf8'): 
         self.encode = encoder
         self.decode = decoder
         self.hasher = hasher
-        
+        self.text_encoding = text_encoding
         
     #TODO finish/test/integrate
     def cid(self, data:bytes|str) -> bytes:
@@ -86,35 +82,63 @@ class DataService:
         """list all known cids"""
         pass
         
-    
-
     def know_file(self, fp:BinaryIO) -> tuple[bytes, bool]: 
-        """remember given data for future retrieval"""
+        """remember given data for future retrieval
+        
+            returns the cid of the data along with a boolean representing whether 
+            the data was unknown to the data service"""
         return self.know_binary(fp.read())
 
     def know(self, data:str|bytes) -> tuple[bytes, bool]: 
-        """remember given data for future retrieval"""
-        return self.know_binary(bytes(data, 'utf8')) if type(data) == str else self.know_binary(data)
+        """remember given data for future retrieval
+        
+            data is either a string (not string-encoded binary data) or raw binary data
+        
+            returns the cid of the data along with a boolean representing whether 
+            the data was unknown to the data service
+        """
+        return self.know_binary(bytes(data, self.text_encoding)) if type(data) == str else self.know_binary(data)
 
     def recall(self, id:bytes|str) -> bytes:
-        """retrieve data associated with id"""
+        """retrieve data associated with id
+        
+            id is either binary hash or binary hash encoded as a string (using self.encode)
+        
+        """
         return self.recall_binary(self.decode(id)) if type(id) == str else self.recall_binary(id)
 
-    def recall_text(self, id:bytes|str) -> bytes:
-        """retrieve data associated with id"""
-        return self.recall_binary(self.decode(id)).decode('utf8') if type(id) == str else str(self.recall_binary(id))
+    def recall_text(self, id:bytes|str) -> str:
+        """retrieve data associated with id as a string
+        
+            id is either binary hash or binary hash encoded as a string (using self.encode)
+            
+            returns data as a string (decoded from binary storage)
+            """
+        return self.recall(id).decode(self.text_encoding)
 
     def recall_stream(self, id:bytes|str) -> BinaryIO:
-        """retrieve data associated with id"""
+        """retrieve data associated with id
+        
+            id is either binary hash or binary hash encoded as a string (using self.encode)
+            
+        """
         id = id if type(id) == bytes else self.decode(id)
         return BytesIO(self.recall_binary(id))
         
     def forget(self, id:bytes|str) -> bytes:
-        """forget data associated with id"""
+        """forget data associated with id
+        
+            id is either binary hash or binary hash encoded as a string (using self.encode)
+            
+        """
         return self.forget_binary(id) if type(id) == bytes else self.forget_binary(self.decode(id))
 
     def known(self, id:bytes|str) -> bool:
-        """determine if value is available for given id"""
+        """determine if value is available for given id
+        
+            id is either binary hash or binary hash encoded as a string (using self.encode)
+            
+        """
         return self.known_binary(id) if type(id) == bytes else self.known_binary(self.decode(id))
 
 
@@ -175,3 +199,56 @@ class KnowledgeService:
     def inquire(self, subject:str|None, property:str|None, value:str|None) -> Iterator[tuple[str, str, str]]:
         """retrieve annotations associated with id"""
         pass
+        
+class InMemoryKnowledgeService(KnowledgeService):
+    def __init__(self, ds: DataService = InMemoryDataService()):    # data service holding serialized triples 
+        self.ds = ds
+        self.subj_to_prop_to_vals = defaultdict(lambda: defaultdict(set))
+        self.prop_to_val_to_subjs = defaultdict(lambda: defaultdict(set))
+
+        for cid in ds.list_known_cids():
+            
+            try:
+                data = ds.recall_binary(cid)
+                text = data.decode("utf-8")
+                triple = json.loads(text)
+            except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+                continue
+
+            if (
+                isinstance(triple, list)
+                and len(triple) == 3
+                and all(isinstance(x, str) for x in triple)
+            ):
+                subject, property, value = triple
+                self._index(subject, property, value)
+
+    def _index(self, subject: str, property: str, value: str) -> None:
+        self.subj_to_prop_to_vals[subject][property].add(value)
+        self.prop_to_val_to_subjs[property][value].add(subject)
+
+    def inquire(
+        self,
+        subject: str | None = None,
+        property: str | None = None,
+        value: str | None = None,
+    ) -> Iterator[tuple[str, str, str]]:
+        """Retrieve matching string triples."""
+        if subject is not None:
+            for prop in ([property] if property is not None else self.subj_to_prop_to_vals[subject].keys()):
+                vals = self.subj_to_prop_to_vals[subject][prop]
+                for val in vals:
+                    if value is None or value == val:
+                        yield subject, prop, val
+
+        elif property is not None:
+            for val in ([value] if value is not None else self.prop_to_val_to_subjs[property].keys()):
+                for subj in self.prop_to_val_to_subjs[property][val]:
+                    yield subj, property, val
+
+        else:
+            for subj, prop_to_vals in self.subj_to_prop_to_vals.items():
+                for prop, vals in prop_to_vals.items():
+                    for val in vals:
+                        if value is None or value == val:
+                            yield subj, prop, val

@@ -34,6 +34,7 @@ class PickleFileBasedDataService(DataService):
         self.levels = levels
         self.dbcache = dict()
         self._closed = False
+        self.dirty_dbs = set()
         
         
     def resolve_db(self, id:str) -> PickleDB:
@@ -65,6 +66,7 @@ class PickleFileBasedDataService(DataService):
         db = self.resolve_db(self.encode(id))
         if not db.get(self.encode(id)):
             db.set(self.encode(id), self.encode(data))
+            self.dirty_dbs.add(db)
             return id, True
         else:
             return id, False
@@ -85,6 +87,7 @@ class PickleFileBasedDataService(DataService):
         """forget data associated with id"""
         db = self.resolve_db(self.encode(id))
         db.remove(self.encode(id))
+        self.dirty_dbs.add(db)
 
     def list_known_cids(self) -> Iterator[bytes]:
         """Yield all known CIDs"""
@@ -103,8 +106,9 @@ class PickleFileBasedDataService(DataService):
                 
 
     def flush(self):
-        for db in self.dbcache.values():
+        for db in self.dirty_dbs():
             db.save()
+        self.dirty_dbs = set()
 
     def close(self):
         if getattr(self, "_closed", False):
