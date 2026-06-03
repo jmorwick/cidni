@@ -11,11 +11,11 @@ import json
 from collections import defaultdict
 from typing import Iterator
 
-from .main import DataService, KnowledgeService
+from .main import DataService, KnowledgeService, InMemoryDataService
 
 
 class InMemoryKnowledgeService(KnowledgeService):
-    def __init__(self, ds: DataService):
+    def __init__(self, ds: DataService = InMemoryDataService()):    # data service holding serialized triples 
         self.ds = ds
         self.subj_to_prop_to_vals = defaultdict(lambda: defaultdict(set))
         self.prop_to_val_to_subjs = defaultdict(lambda: defaultdict(set))
@@ -40,12 +40,6 @@ class InMemoryKnowledgeService(KnowledgeService):
     def _index(self, subject: str, property: str, value: str) -> None:
         self.subj_to_prop_to_vals[subject][property].add(value)
         self.prop_to_val_to_subjs[property][value].add(subject)
-
-    def believe(self, subject: str, property: str, value: str) -> tuple[bytes, bool]:
-        """Associate a string annotation with a string subject."""
-        self._index(subject, property, value)
-        triple_text = json.dumps([subject, property, value])
-        return self.ds.know(triple_text)
 
     def inquire(
         self,

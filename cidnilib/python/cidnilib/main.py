@@ -25,6 +25,11 @@ hashers = {
     12: sha256
 }
 
+
+# TODO: make all params bytes|str
+# TODO: make it easy to extract utf-8 text
+# TODO: make text encoding configurable
+
 class MultiHashEncoder(HashAlgorithm):
 
     def __init__(self, code:int=12):
@@ -46,6 +51,14 @@ class DataService:
         self.encode = encoder
         self.decode = decoder
         self.hasher = hasher
+        
+        
+    #TODO finish/test/integrate
+    def cid(self, data:bytes|str) -> bytes:
+        m = self.hasher()
+        m.update(data)
+        id = self.encode(m.digest())
+        return id
 
 
     @abstractmethod
@@ -89,7 +102,7 @@ class DataService:
 
     def recall_text(self, id:bytes|str) -> bytes:
         """retrieve data associated with id"""
-        return str(self.recall_binary(self.decode(id))) if type(id) == str else str(self.recall_binary(id))
+        return self.recall_binary(self.decode(id)).decode('utf8') if type(id) == str else str(self.recall_binary(id))
 
     def recall_stream(self, id:bytes|str) -> BinaryIO:
         """retrieve data associated with id"""
@@ -105,12 +118,58 @@ class DataService:
         return self.known_binary(id) if type(id) == bytes else self.known_binary(self.decode(id))
 
 
+
+
+class InMemoryDataService(DataService):
+    def __init__(self,
+                 encoder: Callable[[bytes],str] = to_b58_string, 
+                 decoder: Callable[[str],bytes] = from_b58_string, 
+                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder):  
+
+        
+        super().__init__(encoder, decoder, hasher)
+        self.db = dict()
+
+    def know_binary(self, data:bytes):
+        m = self.hasher()
+        m.update(data)
+        id = m.digest()
+        self.db[id] = data
+        return id, True
+
+    def known_binary(self, id:bytes):
+        return id in self.db
+
+    def recall_binary(self, id:bytes):
+        try: return self.db[id]
+        except: return None
+
+    def forget_binary(self, id:bytes):
+        try: del self.db[id]
+        except: return None
+
+    def list_known_cids(self) -> Iterator[bytes]:
+        return self.db.keys()
+
+
+
+
 class KnowledgeService:
 
-    @abstractmethod
+    def __init__(self, 
+                 ds: DataService = InMemoryDataService()):   # data  holding serialized triples
+        self.ds = ds
+
+    #TODO finish/test/integrate
+    def encode(self, subject: str, property: str, value: str) -> bytes:
+        """Associate a string annotation with a string subject."""
+        triple_text = json.dumps([subject, property, value])
+        return self.ds.know(triple_text)
+
     def believe(self, subject: str, property: str, value: str) -> tuple[bytes, bool]:
-        """associate annotation with data"""
-        pass
+        """Associate a string annotation with a string subject."""
+        triple_text = json.dumps([subject, property, value])
+        return self.ds.know(triple_text)
 
     @abstractmethod
     def inquire(self, subject:str|None, property:str|None, value:str|None) -> Iterator[tuple[str, str, str]]:

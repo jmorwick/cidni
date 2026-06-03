@@ -17,34 +17,3 @@ import sys
 from multihash import to_b58_string, from_b58_string
 
 
-class InMemoryDataService(DataService):
-    def __init__(self,
-                 encoder: Callable[[bytes],str] = to_b58_string, 
-                 decoder: Callable[[str],bytes] = from_b58_string, 
-                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder):  
-
-        
-        super().__init__(encoder, decoder, hasher)
-        self.db = dict()
-
-    def know_binary(self, data:bytes):
-        m = self.hasher()
-        m.update(data)
-        id = m.digest()
-        self.db[id] = data
-        return id, True
-
-    def known_binary(self, id:bytes):
-        return id in self.db
-
-    def recall_binary(self, id:bytes):
-        try: return self.db[id]
-        except: return None
-
-    def forget_binary(self, id:bytes):
-        try: del self.db[id]
-        except: return None
-
-    def list_known_cids(self) -> Iterator[bytes]:
-        return self.db.keys()
-

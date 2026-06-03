@@ -4,7 +4,7 @@ Cidnilib - Content ID based data manipulation library
 from setuptools import setup, find_packages
 
 setup(name="cidnilib",
-    version="0.0.1",
+    version="0.0.2",
     description="Content ID based data manipulation library",
     long_description=__doc__,
     author="Joseph Kendall-Morwick",
