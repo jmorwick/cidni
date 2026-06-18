@@ -15,6 +15,8 @@ from hashlib import sha256
 from typing import Protocol, runtime_checkable
 from multihash import to_b58_string, from_b58_string, encode
 from io import BytesIO
+from collections import defaultdict
+import json
 
 @runtime_checkable
 class HashAlgorithm(Protocol):
@@ -42,7 +44,7 @@ class DataService:
     def __init__(self, 
                  encoder: Callable[[bytes],str] = to_b58_string, 
                  decoder: Callable[[str],bytes] = from_b58_string, 
-                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder
+                 hasher: Callable[[],HashAlgorithm] = MultiHashEncoder,
                  text_encoding: str = 'utf8'): 
         self.encode = encoder
         self.decode = decoder

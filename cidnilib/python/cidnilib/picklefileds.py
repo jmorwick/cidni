@@ -106,7 +106,7 @@ class PickleFileBasedDataService(DataService):
                 
 
     def flush(self):
-        for db in self.dirty_dbs():
+        for db in self.dirty_dbs:
             db.save()
         self.dirty_dbs = set()
 
